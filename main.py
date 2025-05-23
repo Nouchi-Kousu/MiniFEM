@@ -11,6 +11,7 @@ from utils.utils import (
     tri_centroid,
     pt2tri_max_dist,
 )
+from utils.mesh import pt_in_circle, tris_unique_edges
 
 use_font("Noto Serif CJK SC")
 
@@ -46,10 +47,7 @@ def main():
     # )
     # plt.savefig("triangle_mesh.png", dpi=600, bbox_inches="tight")
 
-    print(
-        "三角形的重心坐标：",
-        pt2tri_max_dist(np.array([[0, 0]]), points[triangles]),
-    )
+    print(tris_unique_edges(triangles))
 
 
 if __name__ == "__main__":
