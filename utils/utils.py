@@ -150,7 +150,6 @@ class PointArray:
         """
         self._data = np.zeros((initial_capacity, 2), dtype=float)
         self._size = 0
-        self._capacity = initial_capacity
 
     def __len__(self):
         return self._size
@@ -166,26 +165,44 @@ class PointArray:
 
     def add(self, point: NDArray):
         """
-        添加一个点。
+        添加点。
 
         Args:
-            point (NDArray): 点的坐标, shape (2,)
+            point (NDArray): 点的坐标，形状为 (2,) 或 (n, 2)
         """
-        assert point.shape == (2,), "点的形状必须为 (2,)"
-        if self._size >= self._capacity:
-            self._expand()
-        self._data[self._size] = point
-        self._size += 1
+        assert point.shape == (2,) or point.shape[1] == 2, (
+            "点的形状必须为 (2,) 或 (n, 2)"
+        )
+        if point.shape == (2,):  # Single point
+            if (
+                self._size + 1 > self._data.shape[0]
+            ):  # Use > to expand when exactly full and adding one more
+                self._expand()
+            self._data[self._size] = point
+            self._size += 1
+        else:  # Multiple points
+            num_to_add = point.shape[0]
+            while self._size + num_to_add > self._data.shape[0]:
+                self._expand()
+            self._data[self._size : self._size + num_to_add] = point
+            self._size += num_to_add
 
     def _expand(self):
         """
         扩展点数组的容量。
         """
-        new_capacity = self._capacity * 2
-        new_data = np.zeros((new_capacity, 2), dtype=float)
-        new_data[: self._size] = self._data
+        current_allocated_size = self._data.shape[0]
+        if current_allocated_size == 0:
+            new_allocated_size = (
+                10  # Default minimum capacity if array was initially empty
+            )
+        else:
+            new_allocated_size = current_allocated_size * 2
+
+        new_data = np.zeros((new_allocated_size, 2), dtype=float)
+        if self._size > 0:  # Copy existing data if any
+            new_data[: self._size] = self._data[: self._size]
         self._data = new_data
-        self._capacity = new_capacity
 
     def to_numpy(self) -> NDArray:
         """
@@ -195,6 +212,15 @@ class PointArray:
             NDArray: 有效点的数组，形状为 (n, 2)
         """
         return self._data[: self._size]
+
+    def shape(self) -> tuple:
+        """
+        获取点数组的形状。
+
+        Returns:
+            tuple[int, int]: 点数组的形状。
+        """
+        return self.to_numpy().shape
 
 
 class TriangleArray:
@@ -207,8 +233,7 @@ class TriangleArray:
         """
         self._data = np.zeros((initial_capacity, 3), dtype=int)
         self._size = 0
-        self._capacity = initial_capacity
-        self._is_del = np.zeros((initial_capacity, 1), dtype=bool)
+        self._is_del = np.zeros((initial_capacity), dtype=bool)
         self._tri_num = 0
 
     def __len__(self):
@@ -233,26 +258,52 @@ class TriangleArray:
         assert triangle.shape == (3,) or triangle.shape[1] == 3, (
             "三角形的形状必须为 (3,) 或 (n, 3)"
         )
-        if self._size >= self._capacity:
-            self._expand()
-        if triangle.shape[0] == 3:
+
+        if triangle.ndim == 1 and triangle.shape[0] == 3:  # Single triangle
+            num_to_add = 1
+            if self._size + num_to_add > self._data.shape[0]:
+                self._expand()
             self._data[self._size] = triangle
-            self._size += 1
-            self._tri_num += 1
-        elif n := triangle.shape[0] > 3:
-            self._data[self._size : self._size + n] = triangle
-            self._size += n
-            self._tri_num += n
+            self._is_del[self._size] = (
+                False  # Ensure new triangle is not marked as deleted
+            )
+            self._size += num_to_add
+            self._tri_num += num_to_add
+        elif triangle.ndim == 2 and triangle.shape[1] == 3:  # Multiple triangles
+            num_to_add = triangle.shape[0]
+            if num_to_add == 0:  # Nothing to add
+                return
+            while self._size + num_to_add > self._data.shape[0]:
+                self._expand()
+            self._data[self._size : self._size + num_to_add] = triangle
+            self._is_del[self._size : self._size + num_to_add] = (
+                False  # Ensure new triangles are not marked deleted
+            )
+            self._size += num_to_add
+            self._tri_num += num_to_add
+        else:
+            # Should be caught by assert, but as a fallback
+            raise ValueError("Invalid triangle shape")
 
     def _expand(self):
         """
         扩展三角形数组的容量。
         """
-        new_capacity = self._capacity * 2
-        new_data = np.zeros((new_capacity, 3), dtype=int)
-        new_data[: self._size] = self._data
+        current_allocated_size = self._data.shape[0]
+        if current_allocated_size == 0:
+            new_allocated_size = 10  # Default minimum capacity
+        else:
+            new_allocated_size = current_allocated_size * 2
+
+        new_data = np.zeros((new_allocated_size, 3), dtype=int)
+        new_is_del = np.zeros((new_allocated_size), dtype=bool)
+
+        if self._size > 0:  # Copy existing data if any
+            new_data[: self._size] = self._data[: self._size]
+            new_is_del[: self._size] = self._is_del[: self._size]
+
         self._data = new_data
-        self._capacity = new_capacity
+        self._is_del = new_is_del
 
     def to_numpy(self) -> NDArray:
         """
@@ -263,16 +314,33 @@ class TriangleArray:
         """
         return self._data[: self._size]
 
-    def del_tri(self, index: int | list) -> None:
+    def del_tri(self, index: int | list | NDArray) -> None:
         """
         删除指定索引的三角形。
 
         Args:
-            index (int | list): 要删除的三角形索引。
+            index (int | list | NDArray): 要删除的三角形索引。NDArray 为布尔索引
         """
-
-        self._is_del[index] = True
-        self._tri_num -= 1 if isinstance(index, int) else len(index)
+        if isinstance(index, int):
+            if not self._is_del[index]:
+                self._is_del[index] = True
+                self._tri_num -= 1
+        elif isinstance(index, list):
+            index = np.array(index, dtype=int)
+            valid_deletions = ~self._is_del[index]
+            self._is_del[index] = True
+            self._tri_num -= np.sum(valid_deletions)
+        elif isinstance(index, np.ndarray):
+            if index.dtype == bool:
+                index_all = np.zeros_like(self._is_del, dtype=bool)
+                index_all[: index.shape[0]] = index
+                valid_deletions = ~self._is_del[index_all]
+                self._is_del[index_all] = True
+                self._tri_num -= np.sum(valid_deletions)
+            else:
+                valid_deletions = ~self._is_del[index]
+                self._is_del[index] = True
+                self._tri_num -= np.sum(valid_deletions)
 
     def get_tri_num(self) -> int:
         """
@@ -282,3 +350,33 @@ class TriangleArray:
             int: 有效三角形的数量。
         """
         return self._tri_num
+
+    def shape(self) -> tuple:
+        """
+        获取三角形数组的形状。
+
+        Returns:
+            tuple[int, int]: 三角形数组的形状。
+        """
+        return self.to_numpy().shape
+
+    def get_del(self) -> NDArray:
+        return self._is_del[: self._size]
+
+    def clean_up(self) -> None:
+        """
+        清理被删除的三角形，减小存储的三角形数量。
+        """
+        if not np.any(self._is_del[: self._size]):
+            # 没有需要清理的三角形
+            return
+
+        valid_triangles_mask = ~self._is_del[: self._size]
+        self._data[: self._tri_num] = self._data[: self._size][valid_triangles_mask]
+        # For the compacted part, reset deletion flags
+        self._is_del[: self._tri_num] = False
+        # Any flags beyond _tri_num in the _is_del array are irrelevant as _size will be _tri_num
+
+        self._size = self._tri_num
+        # The commented out block for resizing _capacity, _data, and _is_del is removed
+        # as _capacity is removed. Actual shrinking of np arrays is a separate step if desired.

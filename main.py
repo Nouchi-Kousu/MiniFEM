@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import scienceplots
 import matplotlib.pyplot as plt
@@ -12,42 +13,47 @@ from utils.utils import (
     pt2tri_max_dist,
 )
 from utils.mesh import pt_in_circle, tris_unique_edges
+import procedures.mesh_generation as pr_mesh
 
 use_font("Noto Serif CJK SC")
 
 
 def main():
-    # plt.style.use(["science", "nature", "no-latex", "cjk-sc-font"])
-    triangles: NDArray = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4]])
-    points: NDArray = np.array(
-        [[0, 0], [1, 0], [0, 1], [1, 1], [0.5, 1.5]], dtype=float
-    )
-    # stresses: NDArray = np.array([1, 2, 3], dtype=float)
-
-    # fig, ax = plot_tri(triangles, points, stresses=stresses)
-    # x_min: float = np.min(points[:, 0])
-    # x_max: float = np.max(points[:, 0])
-    # x_len: float = x_max - x_min
-    # y_min: float = np.min(points[:, 1])
-    # y_max: float = np.max(points[:, 1])
-    # y_len: float = y_max - y_min
-    # padding: float = 0.1 * max(x_len, y_len)
-    # ax.set_xlim(x_min - padding, x_max + padding)
-    # ax.set_ylim(y_min - padding, y_max + padding)
-    # ax.set_aspect("equal")
-    # ax.set_xlabel("X-axis")
-    # ax.set_ylabel("Y-axis")
-    # ax.set_title("带应力的三角形网格")
-    # fig.colorbar(
-    #     plt.cm.ScalarMappable(
-    #         cmap="rainbow", norm=Normalize(vmin=np.min(stresses), vmax=np.max(stresses))
-    #     ),
-    #     ax=ax,
-    #     label="Stress",
+    # points: NDArray = np.array(
+    #     [
+    #         [i + random.random() / 10, j + random.random() / 10]
+    #         for i in range(-3, 4)
+    #         for j in range(-3, 4)
+    #     ],
+    #     dtype=float,
     # )
-    # plt.savefig("triangle_mesh.png", dpi=600, bbox_inches="tight")
+    # # points = np.array([[-3, -3], [-3, 3], [0.1, 0.1]])
+    # # tri = np.array([[0, 1, 2]])
+    # # print(pt_in_circle(np.array([1, 0]), tri, points))
+    # pt, tri = pr_mesh.gen_mesh_from_pts(points)
 
-    print(tris_unique_edges(triangles))
+    # fig, ax = plot_tri(pt, tri)
+    # plt.show()
+    points = pr_mesh.sample_pts_on_edges(
+        np.array([[0, 0], [1, 0], [2, 2], [0.5, 2.4], [-1, 1]]),
+        np.array([[0, 1], [1, 2], [2, 3], [3, 4], [4, 0]]),
+        0.1,
+    )
+
+    np.random.shuffle(points)
+
+    plt.scatter(points[:, 0], points[:, 1], s=1, c="k", marker="o")
+    plt.show()
+
+    pt, tri = pr_mesh.gen_mesh_from_pts(points)
+
+    fig, ax = plot_tri(pt, tri)
+    plt.savefig("mesh-.png", dpi=300, bbox_inches="tight")
+
+    pt, tri = pr_mesh.refine_mesh(pt, tri, 0.1)
+
+    fig, ax = plot_tri(pt, tri)
+    plt.savefig("mesh.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":

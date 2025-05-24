@@ -10,8 +10,8 @@ import numpy as np
 
 
 def plot_tri(
-    triangles: NDArray,
     points: NDArray,
+    triangles: NDArray,
     stresses: NDArray | None = None,
     color: str = "b",
     linewidth: float = 0.5,
@@ -71,5 +71,12 @@ def plot_tri(
                     **kwargs,
                 )
             )
+
+    # 设置坐标轴范围
+    width = np.max(points[:, 0]) - np.min(points[:, 0])
+    height = np.max(points[:, 1]) - np.min(points[:, 1])
+    padding = 0.1 * max(width, height)
+    ax.set_xlim(np.min(points[:, 0]) - padding, np.max(points[:, 0]) + padding)
+    ax.set_ylim(np.min(points[:, 1]) - padding, np.max(points[:, 1]) + padding)
 
     return fig, ax
