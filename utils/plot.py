@@ -13,7 +13,7 @@ def plot_tri(
     points: NDArray,
     triangles: NDArray,
     stresses: NDArray | None = None,
-    color: str = "b",
+    color: str = "g",
     linewidth: float = 0.5,
     **kwargs,
 ) -> tuple[Figure, Axes]:
@@ -33,7 +33,7 @@ def plot_tri(
     assert triangles.shape[1] == 3, "三角形顶点编号数组的形状应为 (n, 3)"
     assert points.shape[1] == 2, "三角形顶点坐标数组的形状应为 (m, 2)"
     if stresses is not None:
-        assert len(stresses) == len(triangles), (
+        assert stresses.shape[0] == triangles.shape[0], (
             "应力值数组的长度应与三角形数组的长度一致"
         )
 
@@ -41,12 +41,12 @@ def plot_tri(
 
     if stresses is not None:
         # 使用colormap绘制应力云图
-        norm = Normalize(vmin=np.min(stresses), vmax=np.max(stresses))
+        norm: Normalize = Normalize(vmin=np.min(stresses), vmax=np.max(stresses))
         # 使用rainbow colormap表征应力状况
         cmap = cm.get_cmap("rainbow")
 
         for tri, stress in zip(triangles, stresses):
-            pts = points[tri]
+            pts: NDArray = points[tri]
             ax.add_patch(
                 Polygon(
                     pts,
@@ -60,7 +60,7 @@ def plot_tri(
     else:
         # 使用单一颜色绘制三角形
         for tri in triangles:
-            pts = points[tri]
+            pts: NDArray = points[tri]
             ax.add_patch(
                 Polygon(
                     pts,
@@ -73,9 +73,9 @@ def plot_tri(
             )
 
     # 设置坐标轴范围
-    width = np.max(points[:, 0]) - np.min(points[:, 0])
-    height = np.max(points[:, 1]) - np.min(points[:, 1])
-    padding = 0.1 * max(width, height)
+    width: float = np.max(points[:, 0]) - np.min(points[:, 0])
+    height: float = np.max(points[:, 1]) - np.min(points[:, 1])
+    padding: float = 0.1 * max(width, height)
     ax.set_xlim(np.min(points[:, 0]) - padding, np.max(points[:, 0]) + padding)
     ax.set_ylim(np.min(points[:, 1]) - padding, np.max(points[:, 1]) + padding)
 

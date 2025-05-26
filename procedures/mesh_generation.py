@@ -144,7 +144,9 @@ def refine_mesh(
     return pt_tmp.to_numpy(), tri_tmp.to_numpy()[~tri_tmp.get_del()]
 
 
-def sample_pts_on_edges(points: NDArray, adj: NDArray, size: float) -> NDArray:
+def sample_pts_on_edges(
+    points: NDArray, adj: NDArray, size: float
+) -> tuple[NDArray, list[int]]:
     """
     在结构边上均匀布种
 
@@ -154,6 +156,7 @@ def sample_pts_on_edges(points: NDArray, adj: NDArray, size: float) -> NDArray:
         size (float): 网格尺寸
     Returns:
         NDArray: 采样点的坐标，形状为 (k, 2)
+        list: 每条边的采样点索引
     """
     assert points.shape[1] == 2, "点的坐标形状必须为 (n, 2)"
     assert adj.shape[1] == 2, "结构边邻接列表形状必须为 (m, 2)"
@@ -168,6 +171,9 @@ def sample_pts_on_edges(points: NDArray, adj: NDArray, size: float) -> NDArray:
 
     j, k = 0, 0
 
+    # 计算每条边的采样点
+    index_list = [0] * (adj.shape[0] + 1)
+
     for i in range(num_list.shape[0]):
         j = k
         k += num_list[i]
@@ -175,5 +181,6 @@ def sample_pts_on_edges(points: NDArray, adj: NDArray, size: float) -> NDArray:
         pt2 = points[adj[i, 1]]
         seeds[j:k, 0] = np.linspace(pt1[0], pt2[0], num_list[i] + 2)[1:-1]
         seeds[j:k, 1] = np.linspace(pt1[1], pt2[1], num_list[i] + 2)[1:-1]
+        index_list[i + 1] = k
 
-    return np.concatenate((points, seeds), axis=0)
+    return np.concatenate((points, seeds), axis=0), index_list
