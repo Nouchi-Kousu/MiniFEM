@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from utils.utils import tri_area
+from scipy.sparse import lil_array, csr_array
 
 
 def a_list(points: NDArray, triangles: NDArray) -> tuple[NDArray, NDArray, NDArray]:
@@ -139,3 +140,50 @@ def get_K_rs(
     )
 
     return K_rs
+
+
+def assemble_global_stiffness(
+    points: NDArray, triangles: NDArray, E: float = 1.0, nu: float = 0.3, t: float = 1.0
+) -> csr_array:
+    """
+    为给定的点和三角形计算全局刚度矩阵。
+
+    Args:
+        points (NDArray): 点的坐标，形状为 (n, 2)，其中 n 是点的数量。
+        triangles (NDArray): 三角形的顶点索引，形状为 (m, 3)，其中 m 是三角形的数量。
+        E (float): 弹性模量，默认为 1.0。
+        nu (float): 泊松比，默认为 0.3。
+        t (float): 厚度，默认为 1.0。
+
+    Returns:
+        csr_array: 返回csr_matrix格式的全局刚度矩阵的压缩稀疏行格式。
+    """
+    K_e: list[list[NDArray]] = [
+        [
+            get_K_rs(
+                points,
+                triangles,
+                b_list(points, triangles),
+                c_list(points, triangles),
+                i,
+                j,
+                E=E,
+                nu=nu,
+                t=t,
+            )
+            for j in range(3)
+        ]
+        for i in range(3)
+    ]
+
+    K_global: lil_array = lil_array((len(points) * 2, len(points) * 2), dtype=float)
+
+    for idx, tri in enumerate(triangles):
+        for i in range(3):
+            for j in range(3):
+                K_global[tri[i] * 2, tri[j] * 2] += K_e[i][j][idx, 0, 0]
+                K_global[tri[i] * 2, tri[j] * 2 + 1] += K_e[i][j][idx, 0, 1]
+                K_global[tri[i] * 2 + 1, tri[j] * 2] += K_e[i][j][idx, 1, 0]
+                K_global[tri[i] * 2 + 1, tri[j] * 2 + 1] += K_e[i][j][idx, 1, 1]
+
+    return K_global.tocsr()

@@ -58,10 +58,11 @@ def main():
     # plt.show()
 
     pt, tri = pr_mesh.gen_mesh_from_pts(points)
-    b_list = utils_solve.b_list(points, tri)
-    c_list = utils_solve.c_list(points, tri)
-    K_rs = utils_solve.get_K_rs(points, tri, b_list, c_list, 1, 0)
-    print("K_rs:", K_rs)
+    # b_list: tuple = utils_solve.b_list(points, tri)
+    # c_list: tuple = utils_solve.c_list(points, tri)
+    # K_rs: NDArray = utils_solve.get_K_rs(points, tri, b_list, c_list, 1, 0)
+    # print("K_rs:", K_rs)
+    print(utils_solve.assemble_global_stiffness(pt, tri, E=1.0, nu=0.3, t=1.0))
 
     # fig, ax = plot_tri(pt, tri)
     # plt.savefig("mesh-.png", dpi=300, bbox_inches="tight")
