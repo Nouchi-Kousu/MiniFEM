@@ -15,6 +15,7 @@ from utils.utils import (
 from utils.mesh import pt_in_circle, tris_unique_edges
 import procedures.mesh_generation as pr_mesh
 import utils.load as utils_load
+import utils.solve as utils_solve
 
 use_font("Noto Serif CJK SC")
 
@@ -43,20 +44,24 @@ def main():
     # plt.scatter(points[:, 0], points[:, 1], s=1, c="k", marker="o")
     # plt.show()
 
-    print(
-        utils_load.apply_edge_constraints(
-            np.array([[0, 0], [2, 0], [2, 2], [0, 2]]),
-            np.array([[0, 1], [1, 2], [2, 3], [3, 0]]),
-            index_list,
-            [1],
-            [True, False],
-        )
-    )
+    # print(
+    #     utils_load.apply_edge_constraints(
+    #         np.array([[0, 0], [2, 0], [2, 2], [0, 2]]),
+    #         np.array([[0, 1], [1, 2], [2, 3], [3, 0]]),
+    #         index_list,
+    #         [1],
+    #         [True, False],
+    #     )
+    # )
 
     # plt.scatter(points[:, 0], points[:, 1], s=1, c="k", marker="o")
     # plt.show()
 
-    # pt, tri = pr_mesh.gen_mesh_from_pts(points)
+    pt, tri = pr_mesh.gen_mesh_from_pts(points)
+    b_list = utils_solve.b_list(points, tri)
+    c_list = utils_solve.c_list(points, tri)
+    K_rs = utils_solve.get_K_rs(points, tri, b_list, c_list, 1, 0)
+    print("K_rs:", K_rs)
 
     # fig, ax = plot_tri(pt, tri)
     # plt.savefig("mesh-.png", dpi=300, bbox_inches="tight")
