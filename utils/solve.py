@@ -187,3 +187,46 @@ def assemble_global_stiffness(
                 K_global[tri[i] * 2 + 1, tri[j] * 2 + 1] += K_e[i][j][idx, 1, 1]
 
     return K_global.tocsr()
+
+
+def enforce_constraints_diagonal_fix(
+    constraints_list: tuple[list[int], list[float]],
+    K_global: csr_array,
+    P_global: NDArray,
+) -> tuple[csr_array, NDArray]:
+    """
+    使用对角元乘大数法对结构施加约束。
+
+    Args:
+        constraints_list (tuple[list[int], list[float]]): 约束的节点索引列表和对应的约束列表。
+        K_global (csr_array): 全局刚度矩阵。
+        P_global (NDArray): 全局载荷向量。
+
+    Returns:
+        tuple[csr_array, NDArray]: 返回施加约束后的全局刚度矩阵和载荷向量。
+    """
+
+    for dof, val in zip(constraints_list[0], constraints_list[1]):
+        K_global[dof, dof] *= 1e10
+        P_global[dof] = K_global[dof, dof] * val
+
+    return K_global, P_global
+
+
+def P_global(load_tuple: tuple[list[int], list[list[float]]]) -> NDArray:
+    """
+    生成全局载荷向量。
+
+    Args:
+        load_tuple (tuple[list[int], list[float]]): 载荷的节点索引列表和对应的载荷列表。
+
+    Returns:
+        NDArray: 返回全局载荷向量。
+    """
+    P_global: NDArray = np.zeros(len(load_tuple[0]) * 2, dtype=float)
+
+    for dof, val in zip(load_tuple[0], load_tuple[1]):
+        P_global[dof * 2] = val[0]
+        P_global[dof * 2 + 1] = val[1]
+
+    return P_global

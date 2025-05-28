@@ -64,70 +64,58 @@ def distribute_edge_loads(
     return node_list, node_loads
 
 
-def apply_edge_constraints(
+def collect_edge_dof_displacements_for_penalty(
     points: NDArray,
     adj: NDArray,
     index_list: list[int],
     constraints_edge: int | list[int],
-    constraints: list[bool] | list[list[bool]],
-) -> tuple[list[int], list[list[bool]]]:
+    constraints: list[float] | list[list[float] | list[None]],
+) -> tuple[list[int], list[float]]:
     """
-    对选择边施加均布载荷转化为等效节点力
-
-    默认节点在边上均匀分布
+    将边上的位移约束转化为单个自由度上的目标位移值，用于 penalty method。
+    支持仅在某一方向上（如仅 x 或 y）施加约束。
 
     Args:
-        points (NDArray): 多边形定义点的坐标，形状为 (n, 2)
-        adj (NDArray): 多边形边的索引，形状为 (m, 2)
-        index_list (list[int]): 边对应构成节点的索引列表
-        load_edge (int | list[int]): 施加约束的边索引或边索引列表
-        load (list[bool] | list[list[bool]]): 施加在边上的载荷,
-            如果是单一载荷，则为一个列表，形状为 (2, )，对应是否对节点施加x和y方向的约束；
-            如果是多个载荷，则为一个 (2, ) 列表的列表，长度应与边索引列表相同，其中每个列表均为是否对节点施加x和y方向的约束
+        points: (n, 2) 点坐标
+        adj: (m, 2) 边的端点索引
+        index_list: 每条边生成的新点索引（长度 m+1）
+        constraints_edge: 被约束的边索引或其列表
+        constraints:
+            每条边对应的约束目标值，可为：
+                - [0.0, None] 表示仅对 x 方向施加约束，y 不动
+                - [None, 0.0] 表示仅 y 限制
+                - [0.0, 0.0] 表示同时约束
 
     Returns:
-        tuple[list[int], list[list[bool]]]: 返回两个列表，第一个是施加约束的节点索引列表，
-            第二个是每个节点对应的等效载荷列表，形状为 (n, 2)，其中 n 是施加约束的节点数
+        dof_list: 所有被约束的 DOF 全局索引
+        dof_vals: 每个 DOF 对应的目标值
     """
-    assert points.shape[1] == 2, "点的坐标形状必须为 (n, 2)"
-    assert adj.shape[1] == 2, "边的索引形状必须为 (m, 2)"
-    assert len(index_list) == adj.shape[0] + 1, "index_list 长度必须与边的数量相同"
+    if isinstance(constraints_edge, int):
+        constraints_edge = [constraints_edge]
+    if isinstance(constraints[0], float) or constraints[0] is None:
+        constraints = [constraints] * len(constraints_edge)  # type: ignore
 
-    constraints_edge = (
-        [constraints_edge] if isinstance(constraints_edge, int) else constraints_edge
-    )
+    dof_list: list[int] = []
+    dof_vals: list[float] = []
 
-    constraints = (
-        [constraints] * len(constraints_edge)
-        if isinstance(constraints[0], bool)
-        else constraints
-    )  # type: ignore
-
-    assert len(constraints_edge) == len(constraints), (
-        "constraints_edge 和 constraints 的长度必须相同"
-    )
-
-    node_list: list[int] = []
-    node_loads: list[list[bool]] = []
-
-    for idx in range(len(constraints_edge)):
-        adj_idx: int = constraints_edge[idx]
-        node_list += list(
+    for idx, edge_idx in enumerate(constraints_edge):
+        ux, uy = constraints[idx]  # type: ignore
+        mid_nodes = list(
             range(
-                index_list[adj_idx] + points.shape[0],
-                index_list[adj_idx + 1] + points.shape[0],
+                index_list[edge_idx] + points.shape[0],
+                index_list[edge_idx + 1] + points.shape[0],
             )
         )
-        node_list += [
-            int(adj[adj_idx, 0]),
-            int(adj[adj_idx, 1]),
-        ]
-        node_num: int = index_list[adj_idx + 1] - index_list[adj_idx]
+        end_nodes = [int(adj[edge_idx, 0]), int(adj[edge_idx, 1])]
+        all_nodes = mid_nodes + end_nodes
 
-        load_x: bool = constraints[idx][0] # type: ignore
-        load_y: bool = constraints[idx][1] # type: ignore
+        for node in all_nodes:
+            if ux is not None:
+                dof_list.append(node * 2 + 0)
+                dof_vals.append(ux)
+            if uy is not None:
+                dof_list.append(node * 2 + 1)
+                dof_vals.append(uy)
 
-        node_loads += [[load_x, load_y]] * node_num
-        node_loads += [[load_x, load_y]] * 2
+    return dof_list, dof_vals
 
-    return node_list, node_loads
