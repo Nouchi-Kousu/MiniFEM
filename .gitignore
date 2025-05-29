@@ -10,5 +10,6 @@ wheels/
 .venv
 
 /*.png
-/ElegantPaper/*
-/ElegantPaper
+ElegantPaper/*
+ElegantPaper/**
+*.csv

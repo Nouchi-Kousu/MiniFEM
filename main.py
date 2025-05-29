@@ -13,6 +13,7 @@ from math import sqrt
 from rich.console import Console
 from mplfonts import use_font
 from matplotlib.patches import Polygon
+import pandas as pd
 
 console = Console()
 
@@ -22,7 +23,7 @@ use_font("Noto Serif CJK SC")
 
 def main():
     plt.style.use(["science", "ieee", "no-latex", "cjk-sc-font"])
-    load_num = 23
+    load_num = 3
     img_name = f"load{load_num}.png"
 
     model_point = np.array([[0, 0], [1, 0], [1, 5], [1, 7], [1, 10], [0, 10]])
@@ -98,7 +99,7 @@ def main():
     #     [0.0, -10.0],
     # )
 
-    load = ([2, 3], [[-1.0, 0.0], [-1.0, 0.0]])
+    load = ([3], [[-1.0, 0.0]])
 
     pt, tri = pr_mesh.gen_mesh_from_pts(points)
     # fig, ax = plot_tri(pt, tri, linewidth=0.4)
@@ -160,6 +161,19 @@ def main():
     console.log(f"[blue]网格绘制完成，保存为 {img_name}[/blue]")
     print(f"2点位移为: {u[2]}")
     print(f"3点位移为: {u[3]}")
+
+    # 保存 pt, tri, u 到 CSV 文件
+    pt_df = pd.DataFrame(pt, columns=["x", "y"])
+    pt_df.to_csv(f"pt_{img_name}.csv", index=False)
+    console.log(f"[blue]pt 数据已保存到 pt_{img_name}.csv[/blue]")
+
+    tri_df = pd.DataFrame(tri, columns=["pt0", "pt1", "pt2"])
+    tri_df.to_csv(f"tri_{img_name}.csv", index=False)
+    console.log(f"[blue]tri 数据已保存到 tri_{img_name}.csv[/blue]")
+
+    u_df = pd.DataFrame(u, columns=["ux", "uy"])
+    u_df.to_csv(f"u_{img_name}.csv", index=False)
+    console.log(f"[blue]u 数据已保存到 u_{img_name}.csv[/blue]")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ dependencies = [
     "matplotlib>=3.10.3",
     "mplfonts>=0.0.10",
     "numpy>=2.2.6",
+    "pandas>=2.2.3",
     "rich>=14.0.0",
     "scienceplots>=2.1.1",
     "scipy>=1.15.3",
