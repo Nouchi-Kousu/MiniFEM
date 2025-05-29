@@ -27,73 +27,53 @@ def pt_in_circle(point: NDArray, triangle: NDArray, points: NDArray) -> NDArray:
     b = points[triangle[:, 1]]
     c = points[triangle[:, 2]]
 
-    # 计算外接圆的圆心和半径
-    ab = b - a
-    ac = c - a
-    ab_mid = (a + b) / 2
-    ac_mid = (a + c) / 2
-
-    # 计算垂直平分线的方向向量
-    ab_perp = np.array([-ab[:, 1], ab[:, 0]]).T
-    ac_perp = np.array([-ac[:, 1], ac[:, 0]]).T
+    # D = 2 * (a_x * (b_y - c_y) + b_x * (c_y - a_y) + c_x * (a_y - b_y))
+    D = 2 * (
+        a[:, 0] * (b[:, 1] - c[:, 1])
+        + b[:, 0] * (c[:, 1] - a[:, 1])
+        + c[:, 0] * (a[:, 1] - b[:, 1])
+    )
 
     # 初始化结果数组
     is_in_circle = np.zeros(triangle.shape[0], dtype=bool)
+    # 避免除以零，对于共线的点 (D=0)，它们没有定义的外接圆，或者半径无限大
+    # 在这种情况下，我们认为点不在圆内
+    non_collinear_mask = np.abs(D) > 1e-12
 
-    # 对每个三角形单独计算外接圆圆心和判断点是否在圆内
-    for i in range(triangle.shape[0]):
-        current_ab_perp = ab_perp[i]
-        current_ac_perp = ac_perp[i]
+    # 只对非共线的三角形进行计算
+    if np.any(non_collinear_mask):
+        a_sq = np.sum(a[non_collinear_mask] ** 2, axis=1)
+        b_sq = np.sum(b[non_collinear_mask] ** 2, axis=1)
+        c_sq = np.sum(c[non_collinear_mask] ** 2, axis=1)
 
-        current_ab_mid = ab_mid[i]
-        current_ac_mid = ac_mid[i]
+        current_a = a[non_collinear_mask]
+        current_b = b[non_collinear_mask]
+        current_c = c[non_collinear_mask]
+        current_D = D[non_collinear_mask]
 
-        # 构成线性方程组的矩阵 A
-        # A = [[ab_perp_x, ab_perp_y], [ac_perp_x, ac_perp_y]]
-        # 行列式 det(A) = ab_perp_x * ac_perp_y - ab_perp_y * ac_perp_x
-        # 这等价于向量 ab 和 ac 的2D叉积 (ab_x * ac_y - ab_y * ac_x)
-        # 如果为0，则 ab 和 ac 平行，意味着原始点 a, b, c 共线
-        A_matrix = np.stack([current_ab_perp, current_ac_perp], axis=0)
+        # 外接圆圆心坐标 (Ux, Uy)
+        Ux = (
+            a_sq * (current_b[:, 1] - current_c[:, 1])
+            + b_sq * (current_c[:, 1] - current_a[:, 1])
+            + c_sq * (current_a[:, 1] - current_b[:, 1])
+        ) / current_D
+        Uy = (
+            a_sq * (current_c[:, 0] - current_b[:, 0])
+            + b_sq * (current_a[:, 0] - current_c[:, 0])
+            + c_sq * (current_b[:, 0] - current_a[:, 0])
+        ) / current_D
 
-        # 检查矩阵是否奇异 (即顶点是否共线)
-        # 使用一个小的容差值 epsilon 来比较浮点数
-        if np.abs(np.linalg.det(A_matrix)) < 1e-12:
-            is_in_circle[i] = False  # 对于退化三角形，点不在其外接圆内
-        else:
-            # 线性方程组的右侧向量 b
-            b_vector = current_ac_mid - current_ab_mid  # This is dm
+        circumcenters = np.stack((Ux, Uy), axis=1)
 
-            # 当前边的垂直平分线向量
-            v1 = current_ab_perp
-            v2 = current_ac_perp
+        # 外接圆半径的平方 R^2 = (a_x - Ux)^2 + (a_y - Uy)^2
+        circumradius_sq = np.sum((current_a - circumcenters) ** 2, axis=1)
 
-            # 我们要求解 t * v1 - s * v2 = b_vector 得到 t 和 s
-            # 对应的矩阵 M_solve = [[v1_x, -v2_x], [v1_y, -v2_y]]
-            M_solve = np.array([[v1[0], -v2[0]], [v1[1], -v2[1]]])
-            try:
-                # 解出参数 t 和 s
-                params = np.linalg.solve(M_solve, b_vector)
-                t_param = params[0]
+        # 点到圆心的距离的平方
+        point_dist_sq = np.sum(
+            (circumcenters - point) ** 2, axis=1
+        )  # 'point' 是待检查的点
 
-                # 计算外接圆心
-                current_circumcenter = current_ab_mid + t_param * v1
-
-                # 当前三角形的顶点 a
-                current_a_vertex = a[i]
-
-                # 计算外接圆半径
-                current_circumradius = np.linalg.norm(
-                    current_circumcenter - current_a_vertex
-                )
-                # 计算点到圆心的距离
-                current_point_dist = np.linalg.norm(
-                    current_circumcenter - point
-                )  # 'point' 是待检查的点
-
-                is_in_circle[i] = current_point_dist < current_circumradius
-            except np.linalg.LinAlgError:
-                # 理论上行列式检查应该能捕获此情况，这里作为备用
-                is_in_circle[i] = False
+        is_in_circle[non_collinear_mask] = point_dist_sq < circumradius_sq
 
     return is_in_circle
 

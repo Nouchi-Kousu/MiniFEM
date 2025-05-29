@@ -2,6 +2,8 @@ import numpy as np
 from numpy.typing import NDArray
 from utils.utils import tri_area
 from scipy.sparse import lil_array, csr_array
+from rich.console import Console
+console = Console()
 
 
 def a_list(points: NDArray, triangles: NDArray) -> tuple[NDArray, NDArray, NDArray]:
@@ -59,7 +61,7 @@ def b_list(points: NDArray, triangles: NDArray) -> tuple[NDArray, NDArray, NDArr
     y_m: NDArray = points_triangles[:, 2, 1]
 
     b_i: NDArray = y_j - y_m
-    b_j: NDArray = y_i - y_m
+    b_j: NDArray = y_m - y_i
     b_m: NDArray = y_i - y_j
 
     return b_i, b_j, b_m
@@ -88,7 +90,7 @@ def c_list(points: NDArray, triangles: NDArray) -> tuple[NDArray, NDArray, NDArr
     x_m: NDArray = points_triangles[:, 2, 0]
 
     c_i: NDArray = x_m - x_j
-    c_j: NDArray = x_m - x_i
+    c_j: NDArray = x_i - x_m
     c_m: NDArray = x_j - x_i
 
     return c_i, c_j, c_m
@@ -158,6 +160,9 @@ def assemble_global_stiffness(
     Returns:
         csr_array: 返回csr_matrix格式的全局刚度矩阵的压缩稀疏行格式。
     """
+    console.log(
+        "[blue]开始计算全局刚度矩阵[/blue]"
+    )
     K_e: list[list[NDArray]] = [
         [
             get_K_rs(
@@ -213,7 +218,7 @@ def enforce_constraints_diagonal_fix(
     return K_global, P_global
 
 
-def P_global(load_tuple: tuple[list[int], list[list[float]]]) -> NDArray:
+def P_global(load_tuple: tuple[list[int], list[list[float]]], dof: int) -> NDArray:
     """
     生成全局载荷向量。
 
@@ -223,10 +228,74 @@ def P_global(load_tuple: tuple[list[int], list[list[float]]]) -> NDArray:
     Returns:
         NDArray: 返回全局载荷向量。
     """
-    P_global: NDArray = np.zeros(len(load_tuple[0]) * 2, dtype=float)
+    console.log(
+        "[blue]开始生成全局载荷向量[/blue]"
+    )
+    P_global: NDArray = np.zeros(dof, dtype=float)
 
     for dof, val in zip(load_tuple[0], load_tuple[1]):
-        P_global[dof * 2] = val[0]
-        P_global[dof * 2 + 1] = val[1]
+        P_global[dof * 2] += val[0]
+        P_global[dof * 2 + 1] += val[1]
 
     return P_global
+
+
+def S_list(points: NDArray, triangles: NDArray, E: float, nu: float) -> NDArray:
+    """
+    计算应力矩阵
+
+    Args:
+        points (NDArray): 点的坐标，形状为 (n, 2)，其中 n 是点的数量。
+        triangles (NDArray): 三角形的顶点索引，形状为 (m, 3)，其中 m 是三角形的数量。
+        E (float): 弹性模量。
+        nu (float): 泊松比。
+
+    Returns:
+        NDArray: 应力矩阵 (m, 3, 6), 每个三角形对应一个 3x6 的矩阵
+    """
+
+    assert points.shape[1] == 2, "点的形状应为 (n, 2)"
+    assert triangles.shape[1] == 3, "三角形的形状应为 (m, 3)"
+
+    b_ = b_list(points, triangles)
+    c_ = c_list(points, triangles)
+
+    S = []
+
+    for i in range(3):
+        S.append(
+            np.concatenate(
+                (
+                    np.column_stack((b_[i], c_[i] * nu)).reshape((-1, 1, 2)),
+                    np.column_stack((b_[i] * nu, c_[i])).reshape((-1, 1, 2)),
+                    np.column_stack(
+                        ((1 - nu) / 2 * c_[i], (1 - nu) / 2 * b_[i])
+                    ).reshape((-1, 1, 2)),
+                ),
+                axis=2,
+            ).reshape(-1, 3, 2)
+            * (E / (2 * (1 - nu**2) * tri_area(points[triangles]))).reshape(-1, 1, 1)
+        )
+
+    return np.concatenate(S, axis=2)
+
+
+def u_list(points: NDArray, triangles: NDArray, u: NDArray) -> NDArray:
+    """
+    计算单元节点位移矩阵
+    Args:
+        points (NDArray): 点的坐标，形状为 (n, 2)，其中 n 是点的数量。
+        triangles (NDArray): 三角形的顶点索引，形状为 (m, 3)，其中 m 是三角形的数量。
+        u (NDArray): 全局位移向量，形状为 (n, 2)。
+
+    Returns:
+        NDArray: 单元节点位移矩阵 (m, 6)，每个三角形对应三个节点的二维位移。
+    """
+
+    assert points.shape[1] == 2, "点的形状应为 (n, 2)"
+    assert triangles.shape[1] == 3, "三角形的形状应为 (m, 3)"
+    assert u.shape[0] == points.shape[0], "位移向量的长度应为 n"
+
+    u_tri = u[triangles.flatten()].reshape(-1, 6, 1)
+
+    return u_tri

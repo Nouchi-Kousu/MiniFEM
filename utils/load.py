@@ -1,6 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
+from rich.console import Console
 
+console = Console()
 
 def distribute_edge_loads(
     points: NDArray,
@@ -27,6 +29,9 @@ def distribute_edge_loads(
         tuple[list[int], list[list[float]]]: 返回两个列表，第一个是施加载荷的节点索引列表，
             第二个是每个节点对应的等效载荷列表，形状为 (n, 2)，其中 n 是施加载荷的节点数
     """
+    console.log(
+        "[blue]分布载荷转化为等效节点力[/blue]"
+    )
     assert points.shape[1] == 2, "点的坐标形状必须为 (n, 2)"
     assert adj.shape[1] == 2, "边的索引形状必须为 (m, 2)"
     assert len(index_list) == adj.shape[0] + 1, "index_list 长度必须与边的数量相同"
@@ -69,7 +74,7 @@ def collect_edge_dof_displacements_for_penalty(
     adj: NDArray,
     index_list: list[int],
     constraints_edge: int | list[int],
-    constraints: list[float] | list[list[float] | list[None]],
+    constraints: list[float] | list[list[None | float]],
 ) -> tuple[list[int], list[float]]:
     """
     将边上的位移约束转化为单个自由度上的目标位移值，用于 penalty method。
@@ -90,6 +95,9 @@ def collect_edge_dof_displacements_for_penalty(
         dof_list: 所有被约束的 DOF 全局索引
         dof_vals: 每个 DOF 对应的目标值
     """
+    console.log(
+        "[blue]将边上的位移约束转化为单个自由度上的目标位移值[/blue]"
+    )
     if isinstance(constraints_edge, int):
         constraints_edge = [constraints_edge]
     if isinstance(constraints[0], float) or constraints[0] is None:
@@ -100,14 +108,14 @@ def collect_edge_dof_displacements_for_penalty(
 
     for idx, edge_idx in enumerate(constraints_edge):
         ux, uy = constraints[idx]  # type: ignore
-        mid_nodes = list(
+        mid_nodes: list[int] = list(
             range(
                 index_list[edge_idx] + points.shape[0],
                 index_list[edge_idx + 1] + points.shape[0],
             )
         )
-        end_nodes = [int(adj[edge_idx, 0]), int(adj[edge_idx, 1])]
-        all_nodes = mid_nodes + end_nodes
+        end_nodes: list[int] = [int(adj[edge_idx, 0]), int(adj[edge_idx, 1])]
+        all_nodes: list[int] = mid_nodes + end_nodes
 
         for node in all_nodes:
             if ux is not None:
@@ -118,4 +126,3 @@ def collect_edge_dof_displacements_for_penalty(
                 dof_vals.append(uy)
 
     return dof_list, dof_vals
-

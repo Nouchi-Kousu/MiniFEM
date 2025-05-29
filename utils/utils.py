@@ -90,15 +90,15 @@ def tri_area(triangles: NDArray, save_shape: bool = False) -> NDArray:
     """
     assert triangles.shape[1:] == (3, 2), "三角形顶点编号数组的形状应为 (n, 3, 2)"
 
+    ma = np.zeros((triangles.shape[0], 3, 3), dtype=triangles.dtype)
+
+    ma[:, :, :2] = triangles
+    ma[:, :, 2] = 1.0  # 添加齐次坐标
+
     # 计算三角形的面积
-    area: NDArray = (
-        np.abs(
-            np.cross(
-                triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]
-            )
-        )
-        / 2
-    )
+    area: NDArray = 0.5 * np.abs(
+        np.linalg.det(ma)
+    )  # 使用行列式计算面积
     return area.reshape(-1, 1) if save_shape else area
 
 

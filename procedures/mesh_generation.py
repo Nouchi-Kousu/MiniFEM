@@ -1,11 +1,12 @@
-from re import A
 import numpy as np
 import utils.utils as utils
 import utils.mesh as mesh
 from numpy.typing import NDArray
 from utils.utils import TriangleArray, PointArray
-from utils.plot import plot_tri
+from rich.console import Console
+import utils.plot as plot
 import matplotlib.pyplot as plt
+import scienceplots
 
 
 def insert_pts_into_mesh(
@@ -100,7 +101,7 @@ def gen_mesh_from_pts(points: NDArray) -> tuple[NDArray, NDArray]:
 
 
 def refine_mesh(
-    points: NDArray, triangles: NDArray, size: float
+    points: NDArray, triangles: NDArray, size: float, plot_fig: bool = False
 ) -> tuple[NDArray, NDArray]:
     """
     对三角形网格进行细化
@@ -112,6 +113,10 @@ def refine_mesh(
     Returns:
         tuple[NDArray, NDArray]: 细化后的三角形的顶点坐标和三角形的索引
     """
+    from mplfonts import use_font
+    use_font("Noto Serif CJK SC")
+    plt.style.use(["science", "ieee", "no-latex", "cjk-sc-font"])
+
     assert points.shape[1] == 2, "点的坐标形状必须为 (n, 2)"
     assert triangles.shape[1] == 3, "三角形的索引形状必须为 (m, 3)"
 
@@ -131,15 +136,34 @@ def refine_mesh(
         return centroids
 
     centroids = refine_step(pt_tmp, tri_tmp)
+    console = Console()
+    console.log("[blue]网格细化开始[/blue]")
+    if plot_fig:
+        i = 0
 
     while centroids.shape[0] > 0:
-        print(
-            f"细化中，当前剩余点数: {centroids.shape[0]}, 当前网格点数: {pt_tmp.shape()[0]}"
+        console.log(
+            f"[yellow]网格细化中，当前添加点数: {centroids.shape[0]}, 当前网格点数: {pt_tmp.shape()[0]}[/yellow]"
         )
         insert_pts_into_mesh(pt_tmp, tri_tmp, centroids)
         centroids = refine_step(pt_tmp, tri_tmp)
 
         tri_tmp.clean_up()
+        if plot_fig:
+            fig, ax = plot.plot_tri(
+                pt_tmp.to_numpy(),
+                tri_tmp.to_numpy()[~tri_tmp.get_del()],
+                linewidth=0.4,
+            )
+            ax.set_aspect("equal")
+            ax.set_xlabel("X 坐标")
+            ax.set_ylabel("Y 坐标")
+            plt.savefig(f"mesh_refine_step_{i}.png", dpi=600, bbox_inches="tight")
+            i += 1
+            fig.clear()
+            plt.close(fig)
+
+    console.log(f"[green]网格细化完成，当前网格点数: {pt_tmp.shape()[0]}[/green]")
 
     return pt_tmp.to_numpy(), tri_tmp.to_numpy()[~tri_tmp.get_del()]
 
